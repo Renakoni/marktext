@@ -22,7 +22,6 @@ describe('stateToMarkdown — empty list items', () => {
         const md = '- \n- \n- \n\nz\n';
         const out = roundTrip(md, 1);
         expect(out).toBe(md);
-
         const reparsed = new MarkdownToState({
             footnote: false,
             math: false,
@@ -51,6 +50,47 @@ describe('stateToMarkdown — empty list items', () => {
         expect(list.name).toBe('bullet-list');
         expect(list.children).toHaveLength(3);
         expect(list.children[1].children).toHaveLength(0);
+    });
+});
+
+describe('stateToMarkdown — nested empty list items', () => {
+    it('does not serialize nested empty bullet items as a setext heading underline', () => {
+        const states: TState[] = [{
+            name: 'bullet-list',
+            meta: { marker: '-', loose: false },
+            children: [{
+                name: 'list-item',
+                children: [
+                    { name: 'paragraph', text: 'a' },
+                    {
+                        name: 'bullet-list',
+                        meta: { marker: '-', loose: false },
+                        children: [
+                            { name: 'list-item', children: [{ name: 'paragraph', text: '' }] },
+                            { name: 'list-item', children: [{ name: 'paragraph', text: '' }] },
+                        ],
+                    },
+                ],
+            }],
+        }];
+
+        const out = new ExportMarkdown({ listIndentation: 1 }).generate(states);
+        expect(out).toBe('- a\n\n  - \n  - \n');
+
+        const reparsed = new MarkdownToState({
+            footnote: false,
+            math: false,
+            isGitlabCompatibilityEnabled: false,
+            trimUnnecessaryCodeBlockEmptyLines: false,
+            frontMatter: false,
+        }).generate(out);
+        const outer = reparsed[0] as IBulletListState;
+        expect(outer.name).toBe('bullet-list');
+        const parent = outer.children[0];
+        expect(parent.children[0]).toEqual({ name: 'paragraph', text: 'a' });
+        expect(parent.children.some(child => child.name === 'setext-heading')).toBe(false);
+        const nested = parent.children.find(child => child.name === 'bullet-list') as IBulletListState;
+        expect(nested.children).toHaveLength(2);
     });
 });
 
